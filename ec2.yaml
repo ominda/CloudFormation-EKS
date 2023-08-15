@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "CO-Build EC2 instances"
+
+#### >> Need to create a key pair to associate with this bastion host << ####
+Parameters:
+  VpcId:
+    Type: String
+  NamePrefix:
+    Type: String
+  Ec2SubnetIds:
+    Type: String
+  Ec2SubnetAzs:
+    Type: String
+  InstanceProfileRole:
+    Type: String
+  InstanceProfileName: 
+    Type: String
+
+  
+Resources: 
+  BastionHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH access from on-prem
+      GroupName: Bastion-host-SG
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub 
+            - ${VpcShortName}-BastionSG
+            - VpcShortName: !Ref NamePrefix
+  BastionHostSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref BastionHostSecurityGroup
+      IpProtocol: "tcp"
+      CidrIp: "172.16.0.0/12"
+      FromPort: 22
+      ToPort: 22
+      Description: "SSH RULE"
+
+  # Read-Only access to the cluster
+  DescribeCluster:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Policy to describe cluster to execute update kubeconfig command
+      Path: /
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "eks:Describe*"
+    #### > Restric Resource only to the cluster we bilding here < ####
+            Resource: "*"   
+              
+  # Instance Profile
+  BastionHostRole:
+    Type: 'AWS::IAM::Role'
+    Properties:    
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Description: BastionHost Instance Profile
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+        - !Ref DescribeCluster
+      RoleName: !Ref InstanceProfileRole
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - ${vpcShortName}-SSMInstanceProfileRole
+            - vpcShortName: !Ref NamePrefix
+
+  InstanceProfile01:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Ref InstanceProfileName
+      Path: /
+      Roles:
+        - !Ref BastionHostRole
+
+  BastionHost01:
+    Type: AWS::EC2::Instance
+    Properties:
+      IamInstanceProfile: !Ref  InstanceProfile01
+      AvailabilityZone: !Select 
+        - 0
+        - !Split [',', !Ref Ec2SubnetAzs]
+      SubnetId: !Select 
+        - 0
+        - !Split [',', !Ref Ec2SubnetIds]
+      ImageId: ami-00c6c849418b7612c
+      InstanceType: t2.micro
+      KeyName: groupit-nprod_keyPair
+      Monitoring: false
+      SecurityGroupIds: 
+        - !Ref BastionHostSecurityGroup
+      UserData: 
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.17/2023-05-11/bin/linux/amd64/kubectl
+            chmod +x kubectl
+            cp kubectl /usr/bin/
+      Tags:
+        - Key: Name
+          Value: !Sub 
+            - ${VpcShortName}-bastionhost01
+            - VpcShortName: !Ref NamePrefix
+
+Outputs:
+  BastionHostSecurityGroupId: 
+    Value: !GetAtt BastionHostSecurityGroup.GroupId

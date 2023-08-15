@@ -31,6 +31,17 @@ Parameters:
     Default: 198.98.1.0/24
     Description: EKS Cluster CIDR range for VPC 
 
+  # EC2 stack paramaters
+  BastionHostInstanceProfileRoleName:
+    Type: String
+    Default: BastionHostInstanceProfileRoleName
+    Description: Instance Profile Role, attach to Bastion host
+
+  BastionHostInstanceProfileName: 
+    Type: String
+    Default: BastionHostInstanceProfileName
+    Description: Instance profile name
+
 Resources: 
   VpcStack:
     Type: AWS::CloudFormation::Stack
@@ -48,20 +59,22 @@ Resources:
         CIDRBlock03: !Ref CIDRBlock03
 
   # To build EC2 for manage EKS cluster
-  # Ec2Stack:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: 
-  #       Fn::Sub:
-  #         - https://${CfnS3BucketName}.s3.ap-southeast-1.amazonaws.com/${CfnTemplateName}.yaml
-  #         - CfnS3BucketName: !Ref CfnS3Bucket
-  #           CfnTemplateName: ec2
-  # # Runtime vaiables and Parameters 
-  #     Parameters:
-  #       VpcId: !GetAtt VpcStack.Outputs.VpcId
-  #       NamePrefix: !Ref NamePrefix
-  #       Ec2SubnetIds: !GetAtt VpcStack.Outputs.UtilitySubnetIds
-  #       Ec2SubnetAzs: !GetAtt VpcStack.Outputs.UtilityELBSubnetAzs
+  Ec2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 
+        Fn::Sub:
+          - https://${CfnS3BucketName}.s3.ap-southeast-1.amazonaws.com/${CfnTemplateName}.yaml
+          - CfnS3BucketName: !Ref CfnS3Bucket
+            CfnTemplateName: ec2
+  # Runtime vaiables and Parameters 
+      Parameters:
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        NamePrefix: !Ref NamePrefix
+        Ec2SubnetIds: !GetAtt VpcStack.Outputs.UtilitySubnetIds
+        Ec2SubnetAzs: !GetAtt VpcStack.Outputs.UtilityELBSubnetAzs
+        InstanceProfileRole: !Ref BastionHostInstanceProfileRoleName
+        InstanceProfileName: !Ref BastionHostInstanceProfileName
 
   # EksStack:
   #   Type: AWS::CloudFormation::Stack
