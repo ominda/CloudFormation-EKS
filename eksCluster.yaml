@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CO-Build EKS Cluster
+
+Parameters:
+  VpcId: 
+    Type: AWS::EC2::VPC::Id
+  VpcShortName:
+    Type: String
+  EksClusterName:
+    Type: String
+  ControlPlaneSubnetIds:
+    Type: String
+  # ControlPlaneSubnetAzs:
+  #   Type: String
+  EksClusterRoleName:
+    Type: String
+    Default: CO-Build-EksClusterRole
+  ControlPlaneSecurityGroupName:
+    Type: String
+    Default: CO-Build-EKS-SG
+  BastionHostSecurityGroupId:
+    Type: String
+
+Resources:
+  EksClusterRole: 
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Description: CO-Build EKS cluster role
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+      RoleName: !Ref EksClusterRoleName
+
+  EksClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CO-Build EKS cluster security group
+      GroupName: !Ref ControlPlaneSecurityGroupName
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - "${vpcShortName}-EksClusterSecGrp"
+            - vpcShortName: !Ref VpcShortName
+
+  EksClusterSecurityGroupIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      GroupId: !Ref EksClusterSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref EksClusterSecurityGroup
+  
+  IngressBastionHost:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      GroupId: !Ref EksClusterSecurityGroup
+      IpProtocol: "tcp"
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref BastionHostSecurityGroupId
+  
+  EksCluster: 
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref EksClusterName
+      ResourcesVpcConfig:
+        EndpointPrivateAccess: true
+        EndpointPublicAccess: false
+        SecurityGroupIds:
+          - !Ref EksClusterSecurityGroup
+        SubnetIds:
+          - Fn::Select: 
+                - 0
+                - !Split [",", !Ref ControlPlaneSubnetIds]
+          - Fn::Select: 
+                - 1
+                - !Split [",", !Ref ControlPlaneSubnetIds]
+      RoleArn: !GetAtt EksClusterRole.Arn
+      Version: "1.23"
+
+Outputs:
+  EksClusterName:
+    Description: EKS Cluster Name.
+    Value: !Ref EksCluster
+  OpenIdConnectIssuerUrl:
+    Description: EKS Cluster's OIDC provider URL.
+    Value: !GetAtt EksCluster.OpenIdConnectIssuerUrl
+     

@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CO-Build EKS cluster
+
+Parameters: 
+  ClusterName:
+    Type: String
+  CfnS3Bucket: 
+    Type: String
+  VpcId: 
+    Type: String
+  NamePrefix: 
+    Type: String
+  NodeGroupSubnetIds:
+    Type: String
+  NodeGroupSubnetAzs:
+    Type: String
+  ControlPlaneSubnetIds:
+    Type: String
+  ControlPlaneSubnetAzs:
+    Type: String
+  PodSubnetIds:
+    Type: String
+  PodSubnetAzs:
+    Type: String
+  BastionHostSecurityGroupId:
+    Type: String
+
+Resources:   
+  EksClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 
+        !Sub 
+          - https://${cfnBucketName}.s3-ap-southeast-1.amazonaws.com/${cfnTemplateName}.yaml
+          - cfnBucketName: !Ref CfnS3Bucket
+            cfnTemplateName: eksCluster
+      Parameters:
+        #### > Check what are the parameters required for cluster stack < ####
+        VpcId: !Ref VpcId
+        VpcShortName: !Ref NamePrefix
+        EksClusterName: !Ref ClusterName
+        ControlPlaneSubnetIds: !Ref ControlPlaneSubnetIds
+        BastionHostSecurityGroupId: !Ref BastionHostSecurityGroupId
+ 
+  EksRolesStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 
+        !Sub 
+          - https://${cfnBucketName}.s3-ap-southeast-1.amazonaws.com/${cfnTemplateName}.yaml
+          - cfnBucketName: !Ref CfnS3Bucket
+            cfnTemplateName: eksRoles
+      Parameters:
+        OpenIdConnectIssuerUrl: !GetAtt EksClusterStack.Outputs.OpenIdConnectIssuerUrl
+        EksClusterName: !Ref EksClusterName
+        
+  NodeGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 
+        !Sub 
+          - https://${cfnBucketName}.s3-ap-southeast-1.amazonaws.com/${cfnTemplateName}.yaml
+          - cfnBucketName: !Ref CfnS3Bucket
+            cfnTemplateName: nodeGroup 
+      Parameters:
+           #### > Check what are the parameters required for nodeGroup stack < ####
+        VpcId: !Ref VpcId
+        VpcShortName: !Ref NamePrefix
+        EksClusterName: !GetAtt EksClusterStack.Outputs.EksClusterName
+        NodeInstanceRoleArn: !GetAtt EksRolesStack.Outputs.NodeInstanceRoleArn
+        NodeGroupSubnetIds: !Ref NodeGroupSubnetIds
+        NodeGroupSubnetAzs: !Ref NodeGroupSubnetAzs
+

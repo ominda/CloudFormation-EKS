@@ -42,6 +42,12 @@ Parameters:
     Default: BastionHostInstanceProfileName
     Description: Instance profile name
 
+  # EKS stack parameters
+  EksClusterName:
+    Type: String
+    Default: CO-Build-EKS-Cluster
+    Description: EKS cluster name
+
 Resources: 
   VpcStack:
     Type: AWS::CloudFormation::Stack
@@ -76,26 +82,27 @@ Resources:
         InstanceProfileRole: !Ref BastionHostInstanceProfileRoleName
         InstanceProfileName: !Ref BastionHostInstanceProfileName
 
-  # EksStack:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: 
-  #       Fn::Sub:
-  #         - https://${CfnS3BucketName}.s3.ap-southeast-1.amazonaws.com/${CfnTemplateName}.yaml
-  #         - CfnS3BucketName: !Ref CfnS3Bucket
-  #           CfnTemplateName: eks
-  # #### > Need to identify the runtime vaiables and update below Parameters < ####
-  #     Parameters:
-  #       CfnS3Bucket: !Ref CfnS3Bucket
-  #       VpcId: !GetAtt VpcStack.Outputs.VpcId
-  #       NamePrefix: !Ref NamePrefix
-  #       NodeGroupSubnetIds: !GetAtt VpcStack.Outputs.NodeGroupSubnetIds
-  #       NodeGroupSubnetAzs: !GetAtt VpcStack.Outputs.NodeGroupSubnetAzs
-  #       ControlPlaneSubnetIds: !GetAtt VpcStack.Outputs.ControlPlaneSubnetIds
-  #       ControlPlaneSubnetAzs: !GetAtt VpcStack.Outputs.ControlPlaneSubnetAzs
-  #       PodSubnetIds: !GetAtt VpcStack.Outputs.PodSubnetIds
-  #       PodSubnetAzs: !GetAtt VpcStack.Outputs.PodSubnetAzs
-  #       BastionHostSecurityGroupId: !GetAtt Ec2Stack.Outputs.BastionHostSecurityGroupId
+  EksStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 
+        Fn::Sub:
+          - https://${CfnS3BucketName}.s3.ap-southeast-1.amazonaws.com/${CfnTemplateName}.yaml
+          - CfnS3BucketName: !Ref CfnS3Bucket
+            CfnTemplateName: eks
+  #### > Need to identify the runtime vaiables and update below Parameters < ####
+      Parameters:
+        ClusterName: !Ref EksClusterName
+        CfnS3Bucket: !Ref CfnS3Bucket
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        NamePrefix: !Ref NamePrefix
+        NodeGroupSubnetIds: !GetAtt VpcStack.Outputs.NodeGroupSubnetIds
+        NodeGroupSubnetAzs: !GetAtt VpcStack.Outputs.NodeGroupSubnetAzs
+        ControlPlaneSubnetIds: !GetAtt VpcStack.Outputs.ControlPlaneSubnetIds
+        ControlPlaneSubnetAzs: !GetAtt VpcStack.Outputs.ControlPlaneSubnetAzs
+        PodSubnetIds: !GetAtt VpcStack.Outputs.PodSubnetIds
+        PodSubnetAzs: !GetAtt VpcStack.Outputs.PodSubnetAzs
+        BastionHostSecurityGroupId: !GetAtt Ec2Stack.Outputs.BastionHostSecurityGroupId
         
         
         
